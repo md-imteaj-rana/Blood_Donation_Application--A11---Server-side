@@ -12,3 +12,8 @@ app.use(express.json())
 // till here
 
 // new started
+
+// checking the connection to the homepage
+app.get('/', (req, res) => {
+    res.send("Blood Donation Application - A11 : Backend connected.")
+})
