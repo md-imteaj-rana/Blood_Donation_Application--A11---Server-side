@@ -27,7 +27,7 @@ app.listen(port, () => {
 // Cluster
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
-const uri = "mongodb+srv://BloodDonation-A11:BloodDonation-A11@pawmarta10.t0jzost.mongodb.net/?appName=PawMartA10";
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@pawmarta10.t0jzost.mongodb.net/?appName=PawMartA10`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
