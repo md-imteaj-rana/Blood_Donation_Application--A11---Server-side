@@ -93,6 +93,12 @@ async function run() {
     res.send(result);
   });
 
+    //all users
+    app.get('/users', async (req, res) => {
+    const result = await requestsCollections.find({}).toArray();
+    res.send(result);
+  });
+
 
 
     await client.db("admin").command({ ping: 1 });
