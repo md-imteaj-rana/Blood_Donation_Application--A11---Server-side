@@ -47,6 +47,7 @@ async function run() {
     // other api works 
     const database = client.db('BloodDonation-A11')
     const userCollections = database.collection('user')
+    const requestsCollections = database.collection('requests')
 
     app.post('/users', async (req, res)=>{
         const userInfo = req.body;
@@ -67,6 +68,15 @@ async function run() {
         const query = {email:email}
         const result = await userCollections.findOne(query)
         res.send(result)
+    })
+
+    // requests
+    app.post('/requests', async (req, res) => {
+      const data = req.body;
+      data.createdAt = new Date();
+      data.donationStatus = 'Pending';
+      const result = await requestsCollections.insertOne(data)
+      res.send(result)
     })
 
     await client.db("admin").command({ ping: 1 });
