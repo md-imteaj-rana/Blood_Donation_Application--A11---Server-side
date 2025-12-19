@@ -43,10 +43,13 @@ const verifyFBToken = async (req, res, next) => {
   }
 }
 
+
 // checking the connection to the homepage
+
 app.get('/', (req, res) => {
     res.send("Blood Donation Application - A11 : Backend connected.")
 })
+
 
 app.listen(port, () => {
     console.log(`Server is running on port: ${port}.`)
@@ -110,7 +113,7 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/requests/:email', async (req, res) => {
+    app.get('/requests/:email', verifyFBToken, async (req, res) => {
       const email = req.params.email;
       const query = {requesterEmail: email};
 
