@@ -9,7 +9,39 @@ const app = express();
 app.use(cors());
 app.use(express.json())
 
+
 // till here
+
+//firebase sdk 2nd steps
+const admin = require("firebase-admin");
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+// Middleware
+const verifyFBToken = async (req, res, next) => {
+  const token = req.headers.authorization;
+
+  if(!token){
+    return res.status(401).send({message: 'Unauthorized access'})
+  }
+
+  try{
+    const idToken = token.split(' ')[1]
+    const decoded = await admin.auth().verifyIdToken(idToken)
+
+    console.log('decoded info', decoded)
+    
+    req.decoded_email = decoded.email;
+    next();
+  }
+  catch(error){
+    return res.status(401).send({message: 'Unauthorized access error'})
+  }
+}
 
 // checking the connection to the homepage
 app.get('/', (req, res) => {
@@ -25,17 +57,6 @@ app.listen(port, () => {
 // new started
 
 // Cluster
-
-//firebase sdk 2nd steps
-const admin = require("firebase-admin");
-const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
-const serviceAccount = JSON.parse(decoded);
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
-
-// Cluster continued
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@pawmarta10.t0jzost.mongodb.net/?appName=PawMartA10`;
 
@@ -81,7 +102,7 @@ async function run() {
     })
 
     // requests
-    app.post('/requests',  async (req, res) => {
+    app.post('/requests', verifyFBToken, async (req, res) => {
       const data = req.body;
       data.createdAt = new Date();
       data.donationStatus = 'Pending';
