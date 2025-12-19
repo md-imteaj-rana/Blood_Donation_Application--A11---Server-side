@@ -1,5 +1,5 @@
 //This part is same for all the backend connection
-
+const { MongoClient, ServerApiVersion } = require('mongodb');
 const express = require('express');
 const cors = require('cors')
 require('dotenv').config()
@@ -26,7 +26,17 @@ app.listen(port, () => {
 
 // Cluster
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+//firebase sdk 2nd steps
+const admin = require("firebase-admin");
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+// Cluster continued
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@pawmarta10.t0jzost.mongodb.net/?appName=PawMartA10`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -71,7 +81,7 @@ async function run() {
     })
 
     // requests
-    app.post('/requests', async (req, res) => {
+    app.post('/requests',  async (req, res) => {
       const data = req.body;
       data.createdAt = new Date();
       data.donationStatus = 'Pending';
