@@ -14,6 +14,7 @@ app.use(express.json())
 
 //firebase sdk 2nd steps
 const admin = require("firebase-admin");
+//console.log(process.env.FB_SERVICE_KEY)
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
 const serviceAccount = JSON.parse(decoded);
 
@@ -97,11 +98,26 @@ async function run() {
 
 
     app.get('/users/role/:email', async (req, res) =>{
-        const email = req.params
+        const email = req.params.email
 
-        const query = {email:email}
+        const query = {email}
         const result = await userCollections.findOne(query)
         res.send(result)
+    })
+
+    // updating status
+    app.patch('/update/user/status', verifyFBToken, async(req, res) => {
+      const {email, status} = req.query;
+      const query = {email:email};
+
+      const updateStatus = {
+        $set: {
+          status: status
+        }
+      }
+
+      const result = await userCollections.updateOne(query, updateStatus)
+      res.send(result)
     })
 
     // requests
@@ -113,7 +129,8 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/requests/:email', verifyFBToken, async (req, res) => {
+    
+    app.get('/requests/:email', async (req, res) => {
       const email = req.params.email;
       const query = {requesterEmail: email};
 
@@ -128,9 +145,9 @@ async function run() {
   });
 
     //all users
-    app.get('/users', async (req, res) => {
+    app.get('/users', verifyFBToken, async (req, res) => {
     const result = await userCollections.find({}).toArray();
-    res.send(result);
+    res.status(200).send(result);
   });
 
 
