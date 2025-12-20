@@ -4,6 +4,8 @@ const express = require('express');
 const cors = require('cors')
 require('dotenv').config()
 const port = process.env.PORT || 3000
+const stripe = require('stripe')(process.env.STRIPE_SECRECT);
+const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
@@ -34,7 +36,7 @@ const verifyFBToken = async (req, res, next) => {
     const idToken = token.split(' ')[1]
     const decoded = await admin.auth().verifyIdToken(idToken)
 
-    console.log('decoded info', decoded)
+    //console.log('decoded info', decoded)
     
     req.decoded_email = decoded.email;
     next();
@@ -129,13 +131,18 @@ async function run() {
       res.send(result)
     })
 
-    
-    app.get('/requests/:email', async (req, res) => {
+    //my request
+    app.get('/requests/:email', verifyFBToken, async (req, res) => {
       const email = req.params.email;
+      
+      const size = Number(req.query.size);
+      const page = Number(req.query.page);
       const query = {requesterEmail: email};
 
-      const result = await requestsCollections.find(query).toArray();
-      res.send(result)
+      const result = await requestsCollections.find(query).limit(size).skip(size*page).toArray();
+      
+      const totalMyReq = await requestsCollections.countDocuments(query)
+      res.send({request: result, totalMyReq})
     })
 
     //all req
@@ -150,7 +157,41 @@ async function run() {
     res.status(200).send(result);
   });
 
+  // Stripe payments
+  app.post('/create-payment-checkout', async(req, res) => {
+    const donationInfo = req.body;
+    console.log(donationInfo)
+    const amount = parseInt(donationInfo.donateAmount)*100
 
+    const session = await stripe.checkout.sessions.create({
+    line_items: [
+      {
+        price_data: {
+          currency: 'usd',
+          unit_amount: amount,
+          product_data:{
+            name: 'Please Donate'
+          }
+        },
+        quantity: 1,
+      },
+    ],
+    mode: 'payment',
+    metadata:{
+      fundName:donationInfo?.fundName
+    },
+    customer_email:donationInfo?.fundEmail,
+    success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.SITE_DOMAIN}/payment-cancelled`,
+    });
+    //console.log(session.url)
+    res.send({url: session.url})
+  })
+
+  //payment success api to db
+  app.post('/success-payment', async(req, res) => {
+    
+  })
 
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
