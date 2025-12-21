@@ -247,10 +247,44 @@ async function run() {
     if(upazila){
       query.recipientUpazila = upazila;
     }
-    console.log(query);
+    //console.log(query);
     const result = await requestsCollections.find(query).toArray();
     res.send(result)
   })
+
+  // profile fetch users
+  app.get('/users/:email', verifyFBToken, async (req, res) =>{
+        const email = req.params.email
+
+        const query = {email}
+        const result = await userCollections.findOne(query)
+        res.send(result)
+    })
+
+  // profile update patch api
+  app.patch('/update/user', verifyFBToken, async (req, res) => {
+  const email = req.query.email;
+  const updatedInfo = req.body; 
+
+  const filter = { email: email };
+  const updateDoc = {
+    $set: updatedInfo 
+  };
+
+  try {
+    const result = await userCollection.updateOne(filter, updateDoc);
+    console.log(result);
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ message: "User not found" });
+    }
+    
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: "Server error", error });
+   }
+  });
+
 
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
