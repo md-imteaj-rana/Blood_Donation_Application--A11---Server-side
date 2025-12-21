@@ -85,6 +85,7 @@ async function run() {
     const database = client.db('BloodDonation-A11')
     const userCollections = database.collection('user')
     const requestsCollections = database.collection('requests')
+    const fundingCollections = database.collection('fundings')
 
     app.post('/users', async (req, res)=>{
         const userInfo = req.body;
@@ -160,7 +161,7 @@ async function run() {
   // Stripe payments
   app.post('/create-payment-checkout', async(req, res) => {
     const donationInfo = req.body;
-    console.log(donationInfo)
+    //console.log(donationInfo)
     const amount = parseInt(donationInfo.donateAmount)*100
 
     const session = await stripe.checkout.sessions.create({
@@ -190,8 +191,44 @@ async function run() {
 
   //payment success api to db
   app.post('/success-payment', async(req, res) => {
+    const {session_id} = req.query;
+    //console.log(session_id)
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+    //console.log(session);
+
+    // saving to db
+    const transactionId = session.payment_intent;
+
+    const isPaymentExist = await fundingCollections.findOne({transactionId})
+
+    if(isPaymentExist){
+      return
+    }
+
+    if(session.payment_status == 'paid'){
+      const paymentInfo = {
+        amount: session.amount_total/100,
+        currency: session.currency,
+        donorEmail: session.customer_email,
+        donorName: session.customer_details.name,
+        transactionId,
+        payment_status:session.payment_status,
+        paidAt: new Date()
+      }
+
+      const result = await fundingCollections.insertOne(paymentInfo)
+      //console.log(session)
+      res.send(result)
+
+    }
     
   })
+
+  // fetch funding details
+  app.get('/fundings', async (req, res) => {
+    const result = await fundingCollections.find({}).toArray();
+    res.send(result);
+  });
 
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
