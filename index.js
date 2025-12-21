@@ -230,6 +230,28 @@ async function run() {
     res.send(result);
   });
 
+  // fetch for search request
+  app.get('/search-request', async (req, res) => {
+    const {bloodGroup, district, upazila} = req.query;
+    const query = {}
+    if(!query){
+      return
+    }
+    if(bloodGroup){
+      const fixed = bloodGroup.replace(/ /g, "+").trim();
+      query.bloodGroup = fixed;
+    }
+    if(district){
+      query.recipientDistrict = district;
+    }
+    if(upazila){
+      query.recipientUpazila = upazila;
+    }
+    console.log(query);
+    const result = await requestsCollections.find(query).toArray();
+    res.send(result)
+  })
+
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
