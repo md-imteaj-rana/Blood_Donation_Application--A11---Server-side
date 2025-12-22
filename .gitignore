@@ -1,3 +1,4 @@
 node_modules
 .env
 A11-Firebase_sdk.json
+.vercel

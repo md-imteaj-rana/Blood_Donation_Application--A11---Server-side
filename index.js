@@ -360,7 +360,7 @@ async function run() {
 
 
   //confirm donation 
-  app.patch("/requests/confirm/:id", async (req, res) => {
+  app.patch("/requestsdetails/confirm/:id", async (req, res) => {
   const id = req.params.id;
   const { donorName, donorEmail } = req.body;
 
@@ -382,15 +382,46 @@ async function run() {
 
 
   // delete donation requests
-  app.delete("/requests/:id", async (req, res) => {
-  const id = req.params.id;
+  app.get("/usersdelete/role/:email", async (req, res) => {
+  const email = req.params.email;
+  const user = await userCollections.findOne({ email });
 
-  const result = await requestsCollections.deleteOne({
+  res.send({ role: user?.role || "donor" });
+});
+
+app.get("/deleterequests", async (req, res) => {
+  const result = await requestsCollections.find().toArray();
+  res.send(result);
+});
+
+app.delete("/deletingrequests/:id", verifyFBToken, async (req, res) => {
+  const id = req.params.id;
+  const userEmail = req.user.email;
+
+  const request = await requestsCollections.findOne({
     _id: new ObjectId(id),
   });
 
-  res.send(result);
-  });
+  if (!request) {
+    return res.status(404).send({ message: "Request not found" });
+  }
+
+  const user = await userCollections.findOne({ email: userEmail });
+
+  // If not admin AND not owner
+  if (
+    user.role !== "admin" &&
+    request.requesterEmail !== userEmail
+  ) {
+    return res.status(403).send({ message: "Forbidden access" });
+  }
+
+  await requestsCollections.deleteOne({ _id: new ObjectId(id) });
+
+  res.send({ message: "Request deleted successfully" });
+});
+
+
 
 
   // update donation request
@@ -408,7 +439,7 @@ async function run() {
   });
 
   // admin dashboard data fetch 
-  app.get("/admin/stats", async (req, res) => {
+  app.get("/admin/stats", verifyFBToken, async (req, res) => {
   try {
     // Total donors
     const totalDonors = await userCollections.countDocuments({
@@ -443,6 +474,71 @@ async function run() {
   }
   });
 
+  // edit func
+
+  //getting user role
+  app.get("/users/role/:email", async (req, res) => {
+  const email = req.params.email;
+
+  const user = await userCollections.findOne({ email });
+
+  res.send({ role: user?.role });
+  });
+
+  //get single donation request
+  app.get("/requests/:id", async (req, res) => {
+  const id = req.params.id;
+
+  const result = await requestsCollections.findOne({
+    _id: new ObjectId(id),
+  });
+
+  res.send(result);
+  });
+
+  // edit donation role wise
+  app.patch("/requests/edit/:id", async (req, res) => {
+  const id = req.params.id;
+  const updateData = req.body;
+
+  const result = await requestsCollections.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: updateData }
+  );
+
+  res.send(result);
+  });
+
+  // volunteer only status update patch 
+  app.patch("/requests/status/:id", async (req, res) => {
+  const id = req.params.id;
+  const { donationStatus } = req.body;
+
+  const result = await requestsCollections.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: { donationStatus } }
+  );
+
+  res.send(result);
+  });
+
+  // delete my req
+  app.delete("/deletemyrequests/:id", verifyFBToken, async (req, res) => {
+  const id = req.params.id;
+
+  const query = {
+    _id: new ObjectId(id),
+    requesterEmail: req.user.email 
+  };
+
+  const result = await requestsCollections.deleteOne(query);
+
+  if (result.deletedCount === 0) {
+    return res.status(403).send({ message: "Forbidden delete attempt" });
+  }
+
+  res.send(result);
+});
 
 
     await client.db("admin").command({ ping: 1 });
