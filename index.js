@@ -1,5 +1,5 @@
 //This part is same for all the backend connection
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const express = require('express');
 const cors = require('cors')
 require('dotenv').config()
@@ -108,20 +108,47 @@ async function run() {
         res.send(result)
     })
 
-    // updating status
-    app.patch('/update/user/status', verifyFBToken, async(req, res) => {
-      const {email, status} = req.query;
-      const query = {email:email};
-
-      const updateStatus = {
-        $set: {
-          status: status
-        }
+    // updating status 
+    app.patch('/update/user/status', verifyFBToken, async (req, res) => {
+    try {
+      const { email, status } = req.body; // ✅ use req.body
+      if (!email || !status) {
+        return res.status(400).send({ message: "Email and status are required" });
       }
 
-      const result = await userCollections.updateOne(query, updateStatus)
-      res.send(result)
-    })
+      const query = { email };
+      const updateDoc = { $set: { status } };
+
+      const result = await userCollections.updateOne(query, updateDoc);
+
+      if (result.modifiedCount === 0) {
+        return res.status(404).send({ message: "User not found or status unchanged" });
+      }
+
+      res.send({ message: "Status updated successfully", result });
+    } catch (err) {
+      console.error(err);
+      res.status(500).send({ message: "Internal server error" });
+    }
+  });
+
+
+    // user role update patch 
+    app.patch('/update/user/role', verifyFBToken, async (req, res) => {
+    const { email, role } = req.body;
+
+    if (!email || !role) {
+      return res.status(400).send({ message: 'Email and role required' });
+    }
+
+    const query = { email };
+    const updateDoc = {
+      $set: { role }
+    };
+
+    const result = await userCollections.updateOne(query, updateDoc);
+    res.send(result);
+    });
 
     // requests
     app.post('/requests', verifyFBToken, async (req, res) => {
@@ -272,7 +299,7 @@ async function run() {
   };
 
   try {
-    const result = await userCollection.updateOne(filter, updateDoc);
+    const result = await userCollections.updateOne(filter, updateDoc);
     console.log(result);
     
     if (result.matchedCount === 0) {
@@ -284,6 +311,138 @@ async function run() {
     res.status(500).send({ message: "Server error", error });
    }
   });
+
+  //get requests by id
+  app.get("/requestsdetails/:id", async (req, res) => {
+  const { id } = req.params;
+    console.log(id);
+    
+  const result = await requestsCollections.findOne({
+    _id: new ObjectId(id),
+  });
+
+  res.send(result);
+  });
+
+  //patch requests status
+  app.patch("/requestsdetails/:id", async (req, res) => {
+  const { id } = req.params;
+  const { donationStatus, requesterName, requesterEmail } = req.body;
+
+  const updateDoc = {
+    $set: {
+      donationStatus,
+      requesterName,
+      requesterEmail,
+    },
+  };
+
+  const result = await requestsCollections.updateOne(
+    { _id: new ObjectId(id) },
+    updateDoc
+  );
+
+  res.send(result);
+  });
+
+
+  // GET requests created by a donor (by email)
+  app.get("/requests/donor/:email", async (req, res) => {
+    const email = req.params.email;
+
+    const result = await requestsCollections
+      .find({ requesterEmail: email })
+      .sort({ createdAt: -1 }) // recent first
+      .toArray();
+
+    res.send(result);
+  });
+
+
+  //confirm donation 
+  app.patch("/requests/confirm/:id", async (req, res) => {
+  const id = req.params.id;
+  const { donorName, donorEmail } = req.body;
+
+  const updateDoc = {
+    $set: {
+      donationStatus: "inprogress",
+      donorName,
+      donorEmail,
+    },
+  };
+
+  const result = await requestsCollections.updateOne(
+    { _id: new ObjectId(id) },
+    updateDoc
+  );
+
+  res.send(result);
+  });
+
+
+  // delete donation requests
+  app.delete("/requests/:id", async (req, res) => {
+  const id = req.params.id;
+
+  const result = await requestsCollections.deleteOne({
+    _id: new ObjectId(id),
+  });
+
+  res.send(result);
+  });
+
+
+  // update donation request
+  app.patch("/requests/edit/:id", async (req, res) => {
+  const id = req.params.id;
+
+  const updatedData = req.body;
+
+  const result = await requestsCollections.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: updatedData }
+  );
+
+  res.send(result);
+  });
+
+  // admin dashboard data fetch 
+  app.get("/admin/stats", async (req, res) => {
+  try {
+    // Total donors
+    const totalDonors = await userCollections.countDocuments({
+      role: "donor",
+    });
+
+    // Total blood requests
+    const totalRequests = await requestsCollections.countDocuments();
+
+    // Total funding amount
+    const fundingResult = await fundingCollections
+      .aggregate([
+        {
+          $group: {
+            _id: null,
+            totalAmount: { $sum: "$amount" },
+          },
+        },
+      ])
+      .toArray();
+
+    const totalFunding =
+      fundingResult.length > 0 ? fundingResult[0].totalAmount : 0;
+
+    res.send({
+      totalDonors,
+      totalFunding,
+      totalRequests,
+    });
+  } catch (error) {
+    res.status(500).send({ message: "Failed to load admin stats" });
+  }
+  });
+
 
 
     await client.db("admin").command({ ping: 1 });
