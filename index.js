@@ -78,7 +78,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    //await client.connect();
     // Send a ping to confirm a successful connection
 
     // other api works 
@@ -328,9 +328,9 @@ async function run() {
   app.patch("/requestsdetails/:id", async (req, res) => {
   const { id } = req.params;
   const { donationStatus, donorName, donorEmail } = req.body;
-  console.log(req.body,"req bodye");
+  //console.log(req.body,"req bodye");
 
-  console.log(id);
+  //console.log(id);
   
 
   const updateDoc = {
@@ -580,7 +580,7 @@ app.delete('/deletingrequests/:id', verifyFBToken, async (req, res) => {
 });
 
 
-    await client.db("admin").command({ ping: 1 });
+    //await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
