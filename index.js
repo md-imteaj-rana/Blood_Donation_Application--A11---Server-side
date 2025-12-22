@@ -327,13 +327,17 @@ async function run() {
   //patch requests status
   app.patch("/requestsdetails/:id", async (req, res) => {
   const { id } = req.params;
-  const { donationStatus, requesterName, requesterEmail } = req.body;
+  const { donationStatus, donorName, donorEmail } = req.body;
+  console.log(req.body,"req bodye");
+
+  console.log(id);
+  
 
   const updateDoc = {
     $set: {
       donationStatus,
-      requesterName,
-      requesterEmail,
+      donorName: donorName,
+      donorEmail: donorEmail,
     },
   };
 
@@ -394,32 +398,65 @@ app.get("/deleterequests", async (req, res) => {
   res.send(result);
 });
 
-app.delete("/deletingrequests/:id", verifyFBToken, async (req, res) => {
-  const id = req.params.id;
-  const userEmail = req.user.email;
+app.delete('/deletingrequests/:id', verifyFBToken, async (req, res) => {
+	const id = req.params.id
+	const userEmail = req.decoded_email
 
-  const request = await requestsCollections.findOne({
-    _id: new ObjectId(id),
-  });
+	try {
+		// Validate ObjectId format
+		if (!ObjectId.isValid(id)) {
+			return res.status(400).send({ message: 'Invalid request ID format' })
+		}
 
-  if (!request) {
-    return res.status(404).send({ message: "Request not found" });
-  }
+		// Find the request
+		const request = await requestsCollections.findOne({
+			_id: new ObjectId(id),
+		})
 
-  const user = await userCollections.findOne({ email: userEmail });
+		if (!request) {
+			return res.status(404).send({ message: 'Request not found' })
+		}
 
-  // If not admin AND not owner
-  if (
-    user.role !== "admin" &&
-    request.requesterEmail !== userEmail
-  ) {
-    return res.status(403).send({ message: "Forbidden access" });
-  }
+		// Find the user to check their role
+		const user = await userCollections.findOne({ email: userEmail })
 
-  await requestsCollections.deleteOne({ _id: new ObjectId(id) });
+		if (!user) {
+			return res.status(404).send({ message: 'User not found' })
+		}
 
-  res.send({ message: "Request deleted successfully" });
-});
+		// Authorization check:
+		// Admin can delete all requests
+		// Volunteer can only delete their own requests (where requesterEmail matches)
+		const isAdmin = user.role === 'admin'
+		const isOwner = request.requesterEmail === userEmail
+
+		if (!isAdmin && !isOwner) {
+			return res.status(403).send({
+				message: 'Forbidden: You can only delete your own requests',
+			})
+		}
+
+		// Delete the request
+		const result = await requestsCollections.deleteOne({
+			_id: new ObjectId(id),
+		})
+
+		if (result.deletedCount === 0) {
+			return res.status(404).send({ message: 'Failed to delete request' })
+		}
+
+		res.send({
+			message: 'Request deleted successfully',
+			deletedCount: result.deletedCount,
+		})
+	} catch (error) {
+		console.error('Error deleting request:', error)
+		res.status(500).send({
+			message: 'Internal server error',
+			error: error.message,
+		})
+	}
+})
 
 
 
@@ -525,10 +562,12 @@ app.delete("/deletingrequests/:id", verifyFBToken, async (req, res) => {
   // delete my req
   app.delete("/deletemyrequests/:id", verifyFBToken, async (req, res) => {
   const id = req.params.id;
+  console.log(req.user);
+  
 
   const query = {
     _id: new ObjectId(id),
-    requesterEmail: req.user.email 
+    requesterEmail: req.decoded_email 
   };
 
   const result = await requestsCollections.deleteOne(query);
